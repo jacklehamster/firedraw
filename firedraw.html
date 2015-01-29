@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html style="height:100%">
+<head><title>CAnvas</title>
+<style>
+a:link {
+color: #FF00FF;
+}
+a:visited {
+color: #FF00FF;
+}
+</style>
+<script src='https://cdn.firebase.com/js/client/2.0.4/firebase.js'></script>
+<script>
+
+var firebase = new Firebase('https://art-depot.firebaseio.com/firedraw/');
+
+
+
+var pixel,xx,yy,pendown;
+
+function clearAll() {
+   firebase.remove();
+
+   firebase.push({clear:1});
+}
+
+
+
+var shiftX=0,shiftY=0,
+      map={};
+
+document.addEventListener("mousemove",mouseDraw);
+document.addEventListener("mousedown",mouseDraw);
+document.addEventListener("mouseup",mouseDraw);
+document.addEventListener("mouseout",mouseDraw);
+document.addEventListener("mouseover",mouseDraw);
+
+var cursorPoint =null;
+
+function mouseDraw(event) {
+  var canvas = event.target;
+  var ispen = event.type!="mouseout" && (event.buttons!==undefined?event.buttons:event.which);
+  var x = event.pageX;
+  var y = event.pageY;
+  mousePen(x,y,ispen);
+  if(event.type!="mouseout") {
+     if(!cursorPoint) {
+        cursorPoint = {};
+     }
+     cursorPoint.x = x;
+     cursorPoint.y = y;
+  }
+  else
+     cursorPoint = null;
+
+  event.preventDefault();
+}
+
+function getCell(gX,gY) {
+  var cellX = Math.floor(gX/CELLSIZE);
+  var cellY = Math.floor(gY/CELLSIZE);
+  return {id:cellX+"_"+cellY,x:cellX, y:cellY};
+}
+
+var CELLSIZE = 200;
+var preState = {};
+function mousePen(x,y,ispen) {
+  document.getElementById('span').innerHTML = x + "," + y + ":" + ispen;
+  var gX=x+shiftX,gY=y+shiftY;
+  var toCell=getCell(gX,gY);
+ state = {x:gX,y:gY,cell:toCell,pen:ispen};
+  var fromCell = preState.cell;
+ if(ispen||preState.pen) {
+     if(fromCell!==toCell && fromCell) {
+       processPen(fromCell,preState,state);
+    }
+    processPen(toCell,preState,state,fromCell!=toCell);
+  }
+  else {
+    testBoundaries();
+  }
+  preState = state;
+}
+
+function testBoundaries() {
+   if(cursorPoint) {
+        var diff;
+       if(cursorPoint.y<50) {
+           diff=Math.round((50-cursorPoint.y)/20)
+          shiftY -= diff*diff;
+          updateView(null,true);
+      }
+      else if(cursorPoint.y>window.innerHeight-50) {
+           diff = Math.round((cursorPoint.y-(window.innerHeight-50))/20);
+          shiftY += diff*diff;
+          updateView(null,true);
+      }
+
+       if(cursorPoint.x<50) {
+           diff=Math.round((50-cursorPoint.x)/20)
+          shiftX -= diff*diff;
+          updateView(null,true);
+      }
+      else if(cursorPoint.x>window.innerWidth-50) {
+           diff = Math.round((cursorPoint.x-(window.innerWidth-50))/20);
+          shiftX += diff*diff;
+          updateView(null,true);
+      }
+
+   }
+}
+
+function processPen(cell,fromState,toState,doPre) {
+   if(doPre) {
+       firebase.child(cell.id).push({x:fromState.x,y:fromState.y,pen:fromState.pen});
+   }
+   firebase.child(cell.id).push({x:toState.x,y:toState.y,pen:toState.pen});
+}
+
+function showCanvas(cellX,cellY,updatePosition) {
+  var cellid = cellX+"_"+cellY;
+  if(!map[cellid]) {
+     map[cellid] = [];
+     var canvas=document.createElement("canvas");
+     canvas.id = cellid;
+     canvas.width=CELLSIZE;
+     canvas.height=CELLSIZE;
+     canvas.style.position="absolute";
+     canvas.style.left=(cellX*CELLSIZE-shiftX)+"px";
+     canvas.style.top=(cellY*CELLSIZE-shiftY)+"px";
+     canvas.style.backgroundColor="#EEEEEE";
+//     canvas.style.backgroundColor=(cellX+cellY)%2?"#EEEEEE":"#DDDDDD";
+    canvas.getContext("2d").scale(.5,.5);
+     var screen = document.getElementById("screen");
+
+     screen.appendChild(canvas);
+     firebase.child(cellid).on("child_added",
+        function(snapshot) {
+           var o = snapshot.val();
+           var commands = map[cellid];
+          commands.push(o);
+          updateCanvas(cellid,cellX,cellY);
+        }
+     );
+  }
+  if(updatePosition) {
+     canvas =document. getElementById(cellid);
+     canvas.style.left=(cellX*CELLSIZE-shiftX)+"px";
+     canvas.style.top=(cellY*CELLSIZE-shiftY)+"px";
+  }
+}
+
+function updateCanvas(cellid,cellX,cellY) {
+   //console.log(cellid);
+   var canvas = document.getElementById(cellid);
+   var ctx = canvas.getContext("2d");
+   ctx.clearRect(0,0,CELLSIZE*2,CELLSIZE*2);
+   var commands = map[cellid];
+   ctx.beginPath();
+   ctx.lineWidth=2;
+   //  ctx.strokeStyle = "#cccccc";
+    ctx.moveTo(commands[0].x*2-cellX*CELLSIZE*2,commands[0].y*2-cellY*CELLSIZE*2);
+   for(var i=1;i<commands.length;i++) {
+      var command = commands[i];
+      if(commands[i-1].pen) {
+        ctx.lineTo(command.x*2-cellX*CELLSIZE*2,command.y*2-cellY*CELLSIZE*2);
+      }
+      else {
+        ctx.moveTo(command.x*2-cellX*CELLSIZE*2,command.y*2-cellY*CELLSIZE*2);
+      }  
+   }
+   ctx.stroke();
+}
+
+window.addEventListener("resize",updateView);
+
+function updateView(event,doUpdate) {
+   var rect = {x:0,y:0,width:window.innerWidth,height:innerHeight};
+  for(var cellY=Math.floor(shiftY/CELLSIZE);cellY<=Math.ceil((shiftY+rect.height)/CELLSIZE);cellY++) {
+    for(var cellX=Math.floor(shiftX/CELLSIZE);cellX<=Math.ceil((shiftX+rect.width)/CELLSIZE);cellX++) {
+      showCanvas(cellX,cellY,doUpdate);
+    }
+  }
+}
+
+function init(event) {
+   updateView();
+}
+
+
+</script>
+</head>
+<body style="margin:0px; height:100%;position:fixed" onLoad="init(event)">
+<div id="screen" style="">
+</div>
+<div id="toolbar" style="position:absolute">
+<hr>
+<input type="button" value="clear" onclick="clearAll()">
+<br>
+<span id="span"></span>
+<span id="span2"></span>
+
+</div>
+</body>
+</html>
+
