@@ -9,19 +9,39 @@ a:visited {
 color: #FF00FF;
 }
 </style>
-<script src='https://cdn.firebase.com/js/client/2.0.4/firebase.js'></script>
+   
+<script src="https://www.gstatic.com/firebasejs/7.9.1/firebase-app.js"></script>
+
+<!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+
+<script>
+  // Your web app's Firebase configuration
+  var firebaseConfig = {
+    apiKey: "AIzaSyAaxX2V1Le0HEdo6C0ZWyy7QFlgjnkINjs",
+    authDomain: "dobuki.firebaseapp.com",
+    databaseURL: "https://dobuki.firebaseio.com",
+    projectId: "firebase-dobuki",
+    storageBucket: "firebase-dobuki.appspot.com",
+    messagingSenderId: "475686014208",
+    appId: "1:475686014208:web:51af9ceb277fabce3537e5"
+  };
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+</script>   
+   
 <script>
 
-var firebase = new Firebase('https://art-depot.firebaseio.com/firedraw/');
+var fb = new Firebase('https://art-depot.firebaseio.com/firedraw/');
 
 
 
 var pixel,xx,yy,pendown;
 
 function clearAll() {
-   firebase.remove();
+   fb.remove();
 
-   firebase.push({clear:1});
+   fb.push({clear:1});
 }
 
 
@@ -112,9 +132,9 @@ function testBoundaries() {
 
 function processPen(cell,fromState,toState,doPre) {
    if(doPre) {
-       firebase.child(cell.id).push({x:fromState.x,y:fromState.y,pen:fromState.pen});
+       fb.child(cell.id).push({x:fromState.x,y:fromState.y,pen:fromState.pen});
    }
-   firebase.child(cell.id).push({x:toState.x,y:toState.y,pen:toState.pen});
+   fb.child(cell.id).push({x:toState.x,y:toState.y,pen:toState.pen});
 }
 
 function showCanvas(cellX,cellY,updatePosition) {
@@ -134,7 +154,7 @@ function showCanvas(cellX,cellY,updatePosition) {
      var screen = document.getElementById("screen");
 
      screen.appendChild(canvas);
-     firebase.child(cellid).on("child_added",
+     fb.child(cellid).on("child_added",
         function(snapshot) {
            var o = snapshot.val();
            var commands = map[cellid];
